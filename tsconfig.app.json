@@ -21,8 +21,8 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
 
-    /* Path aliases */
-    "baseUrl": ".",
+    /* Path aliases — paths is resolved relative to this tsconfig
+       since TS 4.1, so baseUrl isn't needed (and is deprecated in TS 6+). */
     "paths": {
       "@/*": ["./src/*"]
     }
