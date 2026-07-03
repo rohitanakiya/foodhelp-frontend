@@ -1,59 +1,52 @@
 /**
- * Typed client for the ai-food-backend.
+ * Typed client for the KhanaDedo backend.
  *
- * v1 hits the food-backend directly on http://localhost:4000 since
- * /chat/recommend doesn't require auth. When we layer on auth, this
- * is the single place to swap in /gw/* via the rate-limiter and add
- * the X-API-Key header.
+ * Anonymous calls (like /chat/recommend without a JWT) still work —
+ * they hit the seeded data path. When a JWT is stored via
+ * setStoredToken(), it's injected as Bearer for every subsequent
+ * request; the backend routes those through Swiggy MCP if the user
+ * also has a stored Swiggy access token.
  */
 
 export const API_BASE =
   import.meta.env.VITE_API_BASE ?? "http://localhost:4000";
 
-// ── Response types — mirror the food-backend's chat.service.ts ──
+// ── Token storage helpers (localStorage-backed) ──
 
-export interface ExtractedFilters {
-  city?: string;
-  veg?: boolean;
-  vegan?: boolean;
-  maxPrice?: number;
-  minProtein?: number;
+const TOKEN_KEY = "khanadedo.jwt";
+
+export function getStoredToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
 }
 
-export interface Recommendation {
-  itemName: string;
-  price: string; // pg returns NUMERIC as string
-  protein: number;
-  calories: number;
-  restaurantName: string;
-  rating: string | null;
-  similarity: number | null;
-  score: number;
+export function setStoredToken(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Storage disabled (private mode, quota, etc.). We continue without
+    // persistence; the session survives until page reload.
+  }
 }
 
-export interface RecommendResponse {
-  provider: string;
-  filterProvider?: "groq" | "regex";
-  filterProviderFellBack?: boolean;
-  filters: ExtractedFilters;
-  recommendations: Recommendation[];
-  note?: string;
-}
+// ── Request helper ──
 
-export interface ApiError {
-  error: string;
-  code?: string;
-  details?: unknown;
-}
+async function request<T>(
+  path: string,
+  init: RequestInit = {}
+): Promise<T> {
+  const headers = new Headers(init.headers);
+  if (!headers.has("Content-Type") && init.body) {
+    headers.set("Content-Type", "application/json");
+  }
+  const token = getStoredToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
 
-// ── Request ───────────────────────────────────────────────────
-
-export async function recommendFood(text: string): Promise<RecommendResponse> {
-  const response = await fetch(`${API_BASE}/chat/recommend`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
-  });
+  const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
 
   if (!response.ok) {
     let body: ApiError | string;
@@ -66,8 +59,150 @@ export async function recommendFood(text: string): Promise<RecommendResponse> {
       typeof body === "string"
         ? body
         : body.error ?? `Request failed (${response.status})`;
-    throw new Error(message);
+    const err = new Error(message) as Error & { status?: number };
+    err.status = response.status;
+    throw err;
   }
 
-  return (await response.json()) as RecommendResponse;
+  return (await response.json()) as T;
+}
+
+// ── Response types — mirror the backend ──
+
+export interface ExtractedFilters {
+  city?: string;
+  veg?: boolean;
+  vegan?: boolean;
+  maxPrice?: number;
+  minProtein?: number;
+}
+
+export interface Recommendation {
+  itemName: string;
+  price: string;
+  protein?: number;
+  calories?: number;
+  restaurantName: string;
+  restaurantId?: string;
+  rating: string | null;
+  isVeg?: boolean;
+  isVegan?: boolean | null;
+  description?: string;
+  category?: string | null;
+  swiggyUrl?: string | null;
+  similarity: number | null;
+  score: number;
+}
+
+export interface RecommendResponse {
+  source?: "seed" | "swiggy";
+  provider: string;
+  filterProvider?: "groq" | "regex";
+  filterProviderFellBack?: boolean;
+  filters: ExtractedFilters;
+  addressLabel?: string;
+  recommendations: Recommendation[];
+  swiggyError?: string;
+  needsAddress?: boolean;
+  message?: string;
+  note?: string;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  username: string | null;
+}
+
+export interface LoginResponse {
+  message: string;
+  token: string;
+  user: User & { isActive?: boolean; createdAt?: string };
+}
+
+export interface SignupResponse {
+  message: string;
+  user: User & { createdAt?: string };
+  apiKey?: { rawKey: string; keyId: string; note: string };
+}
+
+export interface ApiError {
+  error: string;
+  code?: string;
+  details?: unknown;
+}
+
+export interface SwiggyStatus {
+  connected: boolean;
+  expiresAt?: string;
+  scope?: string;
+}
+
+// ── Requests ──
+
+export function recommendFood(text: string): Promise<RecommendResponse> {
+  return request<RecommendResponse>("/chat/recommend", {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+}
+
+export function signup(
+  email: string,
+  password: string,
+  username?: string
+): Promise<SignupResponse> {
+  return request<SignupResponse>("/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({ email, password, username }),
+  });
+}
+
+export function login(
+  email: string,
+  password: string
+): Promise<LoginResponse> {
+  return request<LoginResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export function fetchProfile(): Promise<User> {
+  return request<User>("/profile/me");
+}
+
+export function fetchSwiggyStatus(): Promise<SwiggyStatus> {
+  return request<SwiggyStatus>("/auth/swiggy/status");
+}
+
+export function startSwiggyAuth(
+  returnTo?: string
+): Promise<{ authorizeUrl: string }> {
+  return request<{ authorizeUrl: string }>("/auth/swiggy/start", {
+    method: "POST",
+    body: JSON.stringify(returnTo ? { returnTo } : {}),
+  });
+}
+
+export function swiggyLogout(): Promise<{ disconnected: boolean }> {
+  return request<{ disconnected: boolean }>("/auth/swiggy/logout", {
+    method: "POST",
+  });
+}
+
+/** Only available in local dev + when backend is running with SWIGGY_PROVIDER=mock. */
+export function devFakeConnectSwiggy(): Promise<{
+  connected: boolean;
+  provider: string;
+  note: string;
+}> {
+  return request<{ connected: boolean; provider: string; note: string }>(
+    "/auth/swiggy/dev-fake-connect",
+    { method: "POST" }
+  );
+}
+
+export function isDevBackend(): boolean {
+  return API_BASE.includes("localhost");
 }

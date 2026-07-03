@@ -1,4 +1,4 @@
-import { Star, Flame, Beef, IndianRupee } from "lucide-react";
+import { Star, Flame, Beef, IndianRupee, ExternalLink } from "lucide-react";
 import type { Recommendation } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +10,8 @@ interface ResultCardProps {
 export function ResultCard({ item, rank }: ResultCardProps) {
   const similarityPct = item.similarity ? Math.round(item.similarity * 100) : null;
   const ratingValue = item.rating ? Number.parseFloat(item.rating) : null;
+  const hasNutrition =
+    typeof item.protein === "number" && typeof item.calories === "number";
 
   return (
     <div className="group relative flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:hover:border-emerald-700">
@@ -38,16 +40,26 @@ export function ResultCard({ item, rank }: ResultCardProps) {
           label="Price"
           value={`₹${Number.parseFloat(item.price).toFixed(0)}`}
         />
-        <Stat
-          icon={<Beef className="h-4 w-4" />}
-          label="Protein"
-          value={`${item.protein}g`}
-        />
-        <Stat
-          icon={<Flame className="h-4 w-4" />}
-          label="Calories"
-          value={`${item.calories}`}
-        />
+        {hasNutrition ? (
+          <>
+            <Stat
+              icon={<Beef className="h-4 w-4" />}
+              label="Protein"
+              value={`${item.protein}g`}
+            />
+            <Stat
+              icon={<Flame className="h-4 w-4" />}
+              label="Calories"
+              value={`${item.calories}`}
+            />
+          </>
+        ) : (
+          <div className="col-span-2 flex items-center rounded-lg bg-gray-50 p-2 text-xs text-gray-500 dark:bg-gray-800/60 dark:text-gray-400">
+            <span className="truncate">
+              {item.description ?? "From Swiggy — no nutrition data available"}
+            </span>
+          </div>
+        )}
       </div>
 
       {similarityPct !== null && similarityPct > 0 && (
@@ -70,6 +82,18 @@ export function ResultCard({ item, rank }: ResultCardProps) {
             />
           </div>
         </div>
+      )}
+
+      {item.swiggyUrl && (
+        <a
+          href={item.swiggyUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1 flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-orange-600"
+        >
+          Order on Swiggy
+          <ExternalLink className="h-3.5 w-3.5" />
+        </a>
       )}
     </div>
   );

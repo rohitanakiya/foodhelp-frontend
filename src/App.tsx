@@ -1,17 +1,41 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { Utensils, AlertCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Utensils, AlertCircle, LogIn } from "lucide-react";
 import { API_BASE, recommendFood, type RecommendResponse } from "@/lib/api";
+import { useCurrentUser } from "@/lib/auth";
 import { SearchBar } from "@/components/SearchBar";
 import { FilterChips } from "@/components/FilterChips";
 import { ResultCard } from "@/components/ResultCard";
 import { SuggestedQueries } from "@/components/SuggestedQueries";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AuthModal } from "@/components/AuthModal";
+import { UserMenu } from "@/components/UserMenu";
+import { SwiggyPill } from "@/components/SwiggyPill";
 
 export function App() {
-  // Track which query produced the visible results, so we can show
-  // "Results for ..." even after the user starts typing a new search.
   const [activeQuery, setActiveQuery] = useState<string | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
+  const { data: user } = useCurrentUser();
+  const qc = useQueryClient();
+
+  // Handle the ?swiggy=connected redirect from the backend callback.
+  // We refresh the status query and clean the URL so a page reload
+  // doesn't re-trigger the effect.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const swiggyParam = params.get("swiggy");
+    if (swiggyParam) {
+      if (swiggyParam === "connected") {
+        qc.invalidateQueries({ queryKey: ["swiggyStatus"] });
+      }
+      params.delete("swiggy");
+      const cleaned =
+        window.location.pathname +
+        (params.toString() ? `?${params.toString()}` : "") +
+        window.location.hash;
+      window.history.replaceState({}, "", cleaned);
+    }
+  }, [qc]);
 
   const mutation = useMutation<RecommendResponse, Error, string>({
     mutationFn: recommendFood,
@@ -33,21 +57,36 @@ export function App() {
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white">
             <Utensils className="h-5 w-5" />
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               KhanaDedo
             </h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
               Doomscroll khatam. Khana shuru.
             </p>
           </div>
-          <ThemeToggle />
+
+          <div className="flex items-center gap-2">
+            <SwiggyPill />
+            <ThemeToggle />
+            {user ? (
+              <UserMenu />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAuthOpen(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-emerald-300 hover:text-emerald-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-emerald-500 dark:hover:text-emerald-400"
+              >
+                <LogIn className="h-3.5 w-3.5" />
+                Sign in
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-8 space-y-6">
         <SearchBar onSubmit={handleSearch} isLoading={isLoading} />
-
         <SuggestedQueries onPick={handleSearch} disabled={isLoading} />
 
         {error && (
@@ -57,10 +96,9 @@ export function App() {
               <div className="font-medium">Couldn't load recommendations</div>
               <div className="mt-1 text-red-700 dark:text-red-400">{error.message}</div>
               <div className="mt-2 text-xs text-red-600 dark:text-red-400/80">
-                Tried to reach{" "}
-                <code className="font-mono">{API_BASE}</code>. If this is the
-                Render free-tier API, the first request after idle can take
-                ~30s while the service wakes up — try again in a moment.
+                Tried to reach <code className="font-mono">{API_BASE}</code>. If this is the
+                Render free-tier API, the first request after idle can take ~30s while the
+                service wakes up — try again in a moment.
               </div>
             </div>
           </div>
@@ -77,11 +115,22 @@ export function App() {
                   "{activeQuery}"
                 </p>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                via {data.provider}
-                {data.filterProvider && ` + ${data.filterProvider}`}
-                {data.filterProviderFellBack && " (fallback)"}
-              </p>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  via {data.provider}
+                  {data.filterProvider && ` + ${data.filterProvider}`}
+                  {data.filterProviderFellBack && " (fallback)"}
+                </p>
+                {data.source && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    source:{" "}
+                    {data.source === "swiggy" && data.addressLabel
+                      ? `Swiggy (${data.addressLabel})`
+                      : data.source}
+                    {data.swiggyError && " — fallback to seed"}
+                  </p>
+                )}
+              </div>
             </div>
 
             <FilterChips filters={data.filters} />
@@ -94,7 +143,7 @@ export function App() {
               <div className="grid gap-4 sm:grid-cols-2">
                 {data.recommendations.map((item, idx) => (
                   <ResultCard
-                    key={`${item.restaurantName}-${item.itemName}`}
+                    key={`${item.restaurantName}-${item.itemName}-${idx}`}
                     item={item}
                     rank={idx + 1}
                   />
@@ -113,6 +162,8 @@ export function App() {
           </div>
         )}
       </main>
+
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>
   );
 }
