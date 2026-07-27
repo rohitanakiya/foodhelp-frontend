@@ -19,7 +19,6 @@ function buildChips(filters: ExtractedFilters): Chip[] {
         "bg-blue-100 text-blue-800 ring-blue-200 dark:bg-blue-950/50 dark:text-blue-200 dark:ring-blue-800/60",
     });
   }
-  // Vegan implies veg — show the more specific vegan chip and skip veg.
   if (filters.vegan) {
     chips.push({
       label: "🌱 Vegan",
@@ -67,7 +66,7 @@ export function FilterChips({ filters }: FilterChipsProps) {
   const chips = buildChips(filters);
   if (chips.length === 0) {
     return (
-      <p className="text-sm text-gray-500 dark:text-gray-400">
+      <p className="text-sm text-gray-500 dark:text-gray-400 animate-fade-in-up" style={{ animationFillMode: "forwards" }}>
         No specific filters extracted from your query. Showing semantic best matches.
       </p>
     );
@@ -75,11 +74,17 @@ export function FilterChips({ filters }: FilterChipsProps) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Detected:</span>
-      {chips.map((chip) => (
+      <span className="text-sm font-medium text-gray-600 dark:text-gray-300 animate-fade-in-up" style={{ animationFillMode: "forwards" }}>
+        Detected:
+      </span>
+      {chips.map((chip, i) => (
         <span
           key={chip.label}
-          className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ${chip.className}`}
+          className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset animate-fade-in-up ${chip.className}`}
+          style={{
+            animationDelay: `${60 + i * 55}ms`,
+            animationFillMode: "forwards",
+          }}
         >
           {chip.label}
         </span>

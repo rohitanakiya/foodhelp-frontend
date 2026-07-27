@@ -6,11 +6,14 @@ import { useCurrentUser } from "@/lib/auth";
 import { SearchBar } from "@/components/SearchBar";
 import { FilterChips } from "@/components/FilterChips";
 import { ResultCard } from "@/components/ResultCard";
+import { ResultSkeleton } from "@/components/ResultSkeleton";
 import { SuggestedQueries } from "@/components/SuggestedQueries";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AuthModal } from "@/components/AuthModal";
 import { UserMenu } from "@/components/UserMenu";
 import { SwiggyPill } from "@/components/SwiggyPill";
+import { SwiggyReviewNotice } from "@/components/SwiggyReviewNotice";
+import { Hero } from "@/components/Hero";
 
 export function App() {
   const [activeQuery, setActiveQuery] = useState<string | null>(null);
@@ -19,8 +22,6 @@ export function App() {
   const qc = useQueryClient();
 
   // Handle the ?swiggy=connected redirect from the backend callback.
-  // We refresh the status query and clean the URL so a page reload
-  // doesn't re-trigger the effect.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const swiggyParam = params.get("swiggy");
@@ -52,22 +53,24 @@ export function App() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
-        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white">
+      <header className="sticky top-0 z-30 border-b border-cream-200 bg-cream-50/80 backdrop-blur-lg dark:border-gray-800 dark:bg-gray-950/80">
+        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-sm">
             <Utensils className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h1 className="font-serif text-2xl italic leading-none text-gray-900 dark:text-gray-100">
               KhanaDedo
             </h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+            <p className="mt-1 hidden text-xs text-gray-500 dark:text-gray-400 sm:block">
               Doomscroll khatam. Khana shuru.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <SwiggyPill />
+            <div className="hidden sm:block">
+              <SwiggyPill />
+            </div>
             <ThemeToggle />
             {user ? (
               <UserMenu />
@@ -75,19 +78,26 @@ export function App() {
               <button
                 type="button"
                 onClick={() => setAuthOpen(true)}
-                className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-emerald-300 hover:text-emerald-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-emerald-500 dark:hover:text-emerald-400"
+                className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-gray-700 backdrop-blur-sm transition hover:border-emerald-300 hover:text-emerald-700 dark:border-gray-700 dark:bg-gray-900/80 dark:text-gray-300 dark:hover:border-emerald-500 dark:hover:text-emerald-400"
               >
                 <LogIn className="h-3.5 w-3.5" />
-                Sign in
+                <span className="hidden sm:inline">Sign in</span>
               </button>
             )}
           </div>
         </div>
+
+        {/* Swiggy pill on its own row on mobile so it doesn't wrap the header */}
+        <div className="mx-auto flex max-w-4xl items-center justify-end px-4 pb-2 sm:hidden">
+          <SwiggyPill />
+        </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-8 space-y-6">
+      <main className="mx-auto max-w-4xl px-4 py-6 space-y-6 sm:py-8">
         <SearchBar onSubmit={handleSearch} isLoading={isLoading} />
         <SuggestedQueries onPick={handleSearch} disabled={isLoading} />
+
+        <SwiggyReviewNotice />
 
         {error && (
           <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
@@ -104,14 +114,30 @@ export function App() {
           </div>
         )}
 
-        {data && activeQuery && (
+        {isLoading && (
           <section className="space-y-4">
             <div className="flex items-baseline justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Results for
+                  Cooking up results for
                 </p>
                 <p className="text-base font-medium text-gray-900 dark:text-gray-100">
+                  "{activeQuery}"
+                </p>
+              </div>
+            </div>
+            <ResultSkeleton />
+          </section>
+        )}
+
+        {data && activeQuery && !isLoading && (
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Results for
+                </p>
+                <p className="truncate text-base font-medium text-gray-900 dark:text-gray-100">
                   "{activeQuery}"
                 </p>
               </div>
@@ -135,9 +161,25 @@ export function App() {
 
             <FilterChips filters={data.filters} />
 
+            {data.synthesis?.summary && (
+              <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-saffron-50 p-4 text-sm text-emerald-900 shadow-sm dark:border-emerald-800/40 dark:from-emerald-950/40 dark:via-gray-900 dark:to-saffron-950/30 dark:text-emerald-100">
+                <div className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  KhanaDedo says
+                </div>
+                <p className="leading-relaxed">{data.synthesis.summary}</p>
+              </div>
+            )}
+
             {data.recommendations.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
-                No menu items match those filters. Try loosening them.
+              <div className="flex flex-col items-center rounded-2xl border border-dashed border-gray-300 bg-white/70 p-10 text-center dark:border-gray-700 dark:bg-gray-900/70">
+                <div className="mb-4 text-4xl">🥲</div>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Nothing matched those filters.
+                </p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Try loosening a constraint or searching a different vibe.
+                </p>
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
@@ -153,15 +195,13 @@ export function App() {
           </section>
         )}
 
-        {!data && !error && !isLoading && (
-          <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center dark:border-gray-700 dark:bg-gray-900">
-            <Utensils className="mx-auto h-10 w-10 text-gray-300 dark:text-gray-600" />
-            <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-              Search above to see semantic food recommendations.
-            </p>
-          </div>
-        )}
+        {!data && !error && !isLoading && <Hero />}
       </main>
+
+      <footer className="mx-auto max-w-4xl px-4 pb-8 pt-4 text-center text-xs text-gray-400 dark:text-gray-600">
+        Built with local Transformers.js embeddings, Groq LLM intent extraction,
+        and — soon — the Swiggy MCP.
+      </footer>
 
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>

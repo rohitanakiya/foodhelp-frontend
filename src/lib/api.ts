@@ -92,6 +92,14 @@ export interface Recommendation {
   swiggyUrl?: string | null;
   similarity: number | null;
   score: number;
+  /** Groq-generated one-line reason this item earned its rank. */
+  rationale?: string;
+}
+
+export interface Synthesis {
+  summary: string;
+  provider: "groq" | "none";
+  fellBack?: boolean;
 }
 
 export interface RecommendResponse {
@@ -99,6 +107,7 @@ export interface RecommendResponse {
   provider: string;
   filterProvider?: "groq" | "regex";
   filterProviderFellBack?: boolean;
+  synthesis?: Synthesis;
   filters: ExtractedFilters;
   addressLabel?: string;
   recommendations: Recommendation[];
