@@ -8,8 +8,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchProfile,
+  forgotPassword as forgotPasswordRequest,
   getStoredToken,
   login as loginRequest,
+  resetPassword as resetPasswordRequest,
   setStoredToken,
   signup as signupRequest,
   type User,
@@ -85,4 +87,20 @@ export function useLogout() {
     // Wipe every query so we don't leak previous user's data.
     qc.clear();
   };
+}
+
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: async (vars: { email: string }) => {
+      return forgotPasswordRequest(vars.email);
+    },
+  });
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: async (vars: { token: string; password: string }) => {
+      return resetPasswordRequest(vars.token, vars.password);
+    },
+  });
 }

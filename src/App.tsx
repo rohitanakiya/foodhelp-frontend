@@ -10,6 +10,7 @@ import { ResultSkeleton } from "@/components/ResultSkeleton";
 import { SuggestedQueries } from "@/components/SuggestedQueries";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AuthModal } from "@/components/AuthModal";
+import { ResetPasswordModal } from "@/components/ResetPasswordModal";
 import { UserMenu } from "@/components/UserMenu";
 import { SwiggyPill } from "@/components/SwiggyPill";
 import { SwiggyReviewNotice } from "@/components/SwiggyReviewNotice";
@@ -18,18 +19,27 @@ import { Hero } from "@/components/Hero";
 export function App() {
   const [activeQuery, setActiveQuery] = useState<string | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
+  const [resetToken, setResetToken] = useState<string | null>(null);
   const { data: user } = useCurrentUser();
   const qc = useQueryClient();
 
-  // Handle the ?swiggy=connected redirect from the backend callback.
+  // Handle URL-driven flows on mount: ?swiggy=connected (OAuth
+  // return) and ?reset=TOKEN (password reset link from email).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const swiggyParam = params.get("swiggy");
-    if (swiggyParam) {
-      if (swiggyParam === "connected") {
-        qc.invalidateQueries({ queryKey: ["swiggyStatus"] });
-      }
+    const resetParam = params.get("reset");
+
+    if (swiggyParam === "connected") {
+      qc.invalidateQueries({ queryKey: ["swiggyStatus"] });
+    }
+    if (resetParam) {
+      setResetToken(resetParam);
+    }
+
+    if (swiggyParam || resetParam) {
       params.delete("swiggy");
+      params.delete("reset");
       const cleaned =
         window.location.pathname +
         (params.toString() ? `?${params.toString()}` : "") +
@@ -204,6 +214,11 @@ export function App() {
       </footer>
 
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+      <ResetPasswordModal
+        open={!!resetToken}
+        token={resetToken ?? ""}
+        onClose={() => setResetToken(null)}
+      />
     </div>
   );
 }
