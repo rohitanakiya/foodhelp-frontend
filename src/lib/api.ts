@@ -94,6 +94,9 @@ export interface Recommendation {
   score: number;
   /** Groq-generated one-line reason this item earned its rank. */
   rationale?: string;
+  /** True when protein/calories were LLM-estimated (Swiggy path), not
+   *  measured (seed path). UI should mark them visibly as estimates. */
+  nutritionEstimated?: boolean;
 }
 
 export interface Synthesis {

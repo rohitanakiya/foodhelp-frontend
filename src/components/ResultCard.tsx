@@ -55,11 +55,11 @@ export function ResultCard({ item, rank }: ResultCardProps) {
   return (
     <article
       className={cn(
-        "group relative flex flex-col gap-3 overflow-hidden rounded-2xl border bg-white/85 p-5 pl-6 shadow-sm backdrop-blur-sm animate-fade-in-up",
+        "group relative flex flex-col gap-3 overflow-hidden rounded-2xl border bg-white/85 p-5 pl-7 pt-6 shadow-sm backdrop-blur-sm animate-fade-in-up",
         "border-gray-200 transition duration-300",
         "hover:-translate-y-0.5 hover:shadow-lg",
         "dark:border-gray-800 dark:bg-gray-900/70",
-        // Left accent bar — 4px, full height, tied to veg state
+        // Left accent bar — 6px, full height, tied to veg state
         "before:absolute before:inset-y-0 before:left-0 before:w-1.5 before:content-['']",
         accent.leftBar,
         accent.hover
@@ -78,8 +78,8 @@ export function ResultCard({ item, rank }: ResultCardProps) {
         )}
       />
 
-      {/* Rank badge */}
-      <div className="absolute -top-2 -left-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-bold text-white shadow-md ring-2 ring-white dark:bg-white dark:text-gray-900 dark:ring-gray-900">
+      {/* Rank badge — inside the padding zone so overflow-hidden doesn't clip it */}
+      <div className="absolute top-2 left-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-gray-900 text-[11px] font-bold text-white shadow-sm ring-2 ring-white dark:bg-white dark:text-gray-900 dark:ring-gray-900">
         {rank}
       </div>
 
@@ -121,14 +121,16 @@ export function ResultCard({ item, rank }: ResultCardProps) {
         <div className="relative grid grid-cols-3 gap-2">
           <Stat label="Price" value={`₹${priceValue.toFixed(0)}`} />
           <Stat
-            label="Protein"
+            label={item.nutritionEstimated ? "Protein~" : "Protein"}
             value={`${item.protein}g`}
             icon={<Beef className="h-3.5 w-3.5" />}
+            estimated={item.nutritionEstimated}
           />
           <Stat
-            label="Calories"
+            label={item.nutritionEstimated ? "Calories~" : "Calories"}
             value={`${item.calories}`}
             icon={<Flame className="h-3.5 w-3.5" />}
+            estimated={item.nutritionEstimated}
           />
         </div>
       ) : (
@@ -255,18 +257,35 @@ function Stat({
   icon,
   label,
   value,
+  estimated = false,
 }: {
   icon?: React.ReactNode;
   label: string;
   value: string;
+  /** When true, the value came from LLM estimation, not a measurement.
+   *  Rendered with a subtle dashed underline + tilde in the label. */
+  estimated?: boolean;
 }) {
   return (
-    <div className="rounded-lg bg-cream-100/70 p-2 dark:bg-gray-800/60">
+    <div
+      className={cn(
+        "rounded-lg p-2",
+        estimated
+          ? "bg-amber-50/70 dark:bg-amber-950/20"
+          : "bg-cream-100/70 dark:bg-gray-800/60"
+      )}
+      title={estimated ? "Estimated from dish name" : undefined}
+    >
       <div className="flex items-center gap-1 text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
         {icon}
         <span>{label}</span>
       </div>
-      <div className="mt-0.5 font-semibold text-gray-900 dark:text-gray-100">
+      <div
+        className={cn(
+          "mt-0.5 font-semibold text-gray-900 dark:text-gray-100",
+          estimated && "underline decoration-dashed decoration-amber-500/60 underline-offset-2"
+        )}
+      >
         {value}
       </div>
     </div>
