@@ -14,6 +14,7 @@ import { ResetPasswordModal } from "@/components/ResetPasswordModal";
 import { UserMenu } from "@/components/UserMenu";
 import { SwiggyPill } from "@/components/SwiggyPill";
 import { SwiggyReviewNotice } from "@/components/SwiggyReviewNotice";
+import { SwiggyAttribution } from "@/components/SwiggyAttribution";
 import { Hero } from "@/components/Hero";
 
 export function App() {
@@ -169,6 +170,13 @@ export function App() {
               </div>
             </div>
 
+            {/* Swiggy source + re-rank attribution. See
+                SwiggyAttribution.tsx. Only shown when the response was
+                actually served from Swiggy data. */}
+            {data.source === "swiggy" && (
+              <SwiggyAttribution addressLabel={data.addressLabel} />
+            )}
+
             <FilterChips filters={data.filters} />
 
             {data.synthesis?.summary && (
@@ -209,8 +217,13 @@ export function App() {
       </main>
 
       <footer className="mx-auto max-w-4xl px-4 pb-8 pt-4 text-center text-xs text-gray-400 dark:text-gray-600">
-        Built with local Transformers.js embeddings, Groq LLM intent extraction,
-        and — soon — the Swiggy MCP.
+        <p>
+          Restaurant &amp; menu data <span className="font-medium">powered by Swiggy</span>.
+          Results re-ranked by KhanaDedo against your stated preferences.
+        </p>
+        <p className="mt-1 opacity-70">
+          Built with local Transformers.js embeddings and Groq LLM intent extraction.
+        </p>
       </footer>
 
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
