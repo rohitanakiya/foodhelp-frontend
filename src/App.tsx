@@ -15,7 +15,9 @@ import { UserMenu } from "@/components/UserMenu";
 import { SwiggyPill } from "@/components/SwiggyPill";
 import { SwiggyReviewNotice } from "@/components/SwiggyReviewNotice";
 import { SwiggyAttribution } from "@/components/SwiggyAttribution";
+import { DemoBanner } from "@/components/DemoBanner";
 import { Hero } from "@/components/Hero";
+import { useConnectSwiggy, useSwiggyStatus } from "@/lib/swiggy";
 
 export function App() {
   const [activeQuery, setActiveQuery] = useState<string | null>(null);
@@ -23,6 +25,9 @@ export function App() {
   const [resetToken, setResetToken] = useState<string | null>(null);
   const { data: user } = useCurrentUser();
   const qc = useQueryClient();
+  // Swiggy status drives the DemoBanner variant (anon vs signed-in-no-Swiggy).
+  const { data: swiggyStatus } = useSwiggyStatus(!!user);
+  const connectSwiggy = useConnectSwiggy();
 
   // Handle URL-driven flows on mount: ?swiggy=connected (OAuth
   // return) and ?reset=TOKEN (password reset link from email).
@@ -175,6 +180,22 @@ export function App() {
                 actually served from Swiggy data. */}
             {data.source === "swiggy" && (
               <SwiggyAttribution addressLabel={data.addressLabel} />
+            )}
+
+            {/* Demo-mode banner — shown whenever the results came from
+                the hand-seeded dataset instead of live Swiggy. Prompts
+                the user toward whatever step will get them real results. */}
+            {data.source === "seed" && (
+              <DemoBanner
+                isSignedIn={!!user}
+                onSignIn={() => setAuthOpen(true)}
+                onConnectSwiggy={
+                  user && !swiggyStatus?.connected
+                    ? () => connectSwiggy.mutate()
+                    : undefined
+                }
+                swiggyError={data.swiggyError}
+              />
             )}
 
             <FilterChips filters={data.filters} />
