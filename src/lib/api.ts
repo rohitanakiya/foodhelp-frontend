@@ -79,6 +79,9 @@ export interface ExtractedFilters {
 
 export interface Recommendation {
   itemName: string;
+  /** Swiggy's menu_item_id — needed for add-to-cart calls. Undefined
+   *  on seed items. */
+  itemId?: string;
   price: string;
   protein?: number;
   calories?: number;
@@ -179,6 +182,37 @@ export function recommendFood(
  *  isn't signed in or hasn't connected Swiggy — safe to call always. */
 export function fetchSwiggyAddresses(): Promise<AddressListResponse> {
   return request<AddressListResponse>("/chat/addresses");
+}
+
+export interface AddToCartRequest {
+  restaurantId: string;
+  menuItemId: string;
+  addressId?: string;
+  restaurantName?: string;
+}
+
+export interface AddToCartResponse {
+  ok: boolean;
+  /** Present on success — Swiggy checkout URL to open in a new tab. */
+  checkoutUrl?: string;
+  message?: string;
+  /** Present on failure when the item needs manual customization on
+   *  Swiggy — the restaurant menu URL to fall back to. */
+  fallbackMenuUrl?: string;
+  needsSwiggy?: boolean;
+}
+
+/** Adds one item to the caller's Swiggy cart via our backend, which
+ *  in turn calls Swiggy's `update_food_cart` MCP tool. The frontend
+ *  should open `checkoutUrl` on success, or `fallbackMenuUrl` on
+ *  failure (items with required variants can't be added blindly). */
+export function addToSwiggyCart(
+  body: AddToCartRequest
+): Promise<AddToCartResponse> {
+  return request<AddToCartResponse>("/chat/cart", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 export function signup(

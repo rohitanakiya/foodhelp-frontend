@@ -6,12 +6,15 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  addToSwiggyCart,
   devFakeConnectSwiggy,
   fetchSwiggyAddresses,
   fetchSwiggyStatus,
   startSwiggyAuth,
   swiggyLogout,
   type AddressListResponse,
+  type AddToCartRequest,
+  type AddToCartResponse,
   type SwiggyStatus,
 } from "./api";
 
@@ -69,6 +72,16 @@ export function useDisconnectSwiggy() {
     onSuccess: () => {
       qc.setQueryData(SWIGGY_STATUS_KEY, { connected: false });
     },
+  });
+}
+
+/** Add one item to the user's Swiggy cart via our backend. On success
+ *  the returned checkoutUrl should be opened in a new tab; on the
+ *  "needs customization" failure, fallbackMenuUrl should be opened
+ *  instead. Mutation state (isPending / isError) drives the button UI. */
+export function useAddToSwiggyCart() {
+  return useMutation<AddToCartResponse, Error, AddToCartRequest>({
+    mutationFn: addToSwiggyCart,
   });
 }
 

@@ -1,6 +1,13 @@
-import { Star, Flame, Beef, ArrowUpRight, MapPin } from "lucide-react";
+import { useState } from "react";
+import { Star, Flame, Beef, ArrowUpRight, MapPin, Loader2, Check, AlertCircle } from "lucide-react";
 import type { Recommendation } from "@/lib/api";
+import { useCurrentUser } from "@/lib/auth";
+import { useAddToSwiggyCart, useSwiggyStatus } from "@/lib/swiggy";
 import { cn } from "@/lib/utils";
+
+/** Same localStorage key the AddressPicker writes to. Reading it here
+ *  avoids drilling addressId through 3 layers of props. */
+const ADDRESS_STORAGE_KEY = "khanadedo.addressId";
 
 interface ResultCardProps {
   item: Recommendation;
@@ -188,24 +195,150 @@ export function ResultCard({ item, rank }: ResultCardProps) {
         </p>
       )}
 
-      {/* Order on Swiggy — deep-link to the item's restaurant page */}
-      {item.swiggyUrl && (
-        <a
-          href={item.swiggyUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            "relative mt-1 flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-white transition",
-            "bg-gradient-to-r from-orange-500 to-saffron-500",
-            "hover:from-orange-600 hover:to-saffron-600 hover:shadow-md hover:shadow-orange-500/30",
-            "active:scale-[0.98]"
-          )}
-        >
-          Order on Swiggy
-          <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-        </a>
-      )}
+      {/* Cart / Order button — see CartButton for the two-mode logic */}
+      <CartButton item={item} />
     </article>
+  );
+}
+
+/**
+ * Two-mode CTA at the bottom of every card:
+ *   - "Add to Swiggy cart" — when the user is signed in AND connected
+ *     to Swiggy AND the item came from Swiggy (has itemId + restaurantId).
+ *     Clicking calls our /chat/cart endpoint which uses update_food_cart
+ *     to actually add the item to the user's Swiggy cart, then opens
+ *     swiggy.com/checkout in a new tab. If Swiggy rejects (item needs
+ *     variants/addons the user must pick), we fall back to opening the
+ *     menu page so the user can customize + add themselves.
+ *   - "View on Swiggy" — for anonymous users, users without a Swiggy
+ *     connection, or seed items. Just opens the URL we have.
+ */
+function CartButton({ item }: { item: Recommendation }) {
+  const { data: user } = useCurrentUser();
+  const { data: swiggyStatus } = useSwiggyStatus(!!user);
+  const addToCart = useAddToSwiggyCart();
+  const [openedUrl, setOpenedUrl] = useState<string | null>(null);
+
+  const canAddToCart =
+    !!user &&
+    !!swiggyStatus?.connected &&
+    !!item.itemId &&
+    !!item.restaurantId &&
+    item.restaurantId !== "unknown";
+
+  if (!canAddToCart) {
+    // Fallback: plain deep-link. No cart-add attempt.
+    if (!item.swiggyUrl) return null;
+    return (
+      <a
+        href={item.swiggyUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn(
+          "relative mt-1 flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-white transition",
+          "bg-gradient-to-r from-orange-500 to-saffron-500",
+          "hover:from-orange-600 hover:to-saffron-600 hover:shadow-md hover:shadow-orange-500/30",
+          "active:scale-[0.98]"
+        )}
+      >
+        View on Swiggy
+        <ArrowUpRight className="h-3.5 w-3.5" />
+      </a>
+    );
+  }
+
+  const handleClick = async () => {
+    // Read the current address selection at click time (not render time)
+    // so a change in the picker takes effect immediately.
+    let addressId: string | undefined;
+    try {
+      addressId = localStorage.getItem(ADDRESS_STORAGE_KEY) ?? undefined;
+    } catch {
+      /* storage blocked — backend falls back to default address */
+    }
+
+    try {
+      const result = await addToCart.mutateAsync({
+        restaurantId: item.restaurantId!,
+        menuItemId: item.itemId!,
+        addressId,
+        restaurantName: item.restaurantName,
+      });
+      if (result.ok && result.checkoutUrl) {
+        window.open(result.checkoutUrl, "_blank", "noopener,noreferrer");
+        setOpenedUrl(result.checkoutUrl);
+      } else if (result.fallbackMenuUrl) {
+        // Add-to-cart failed (probably needs variants). Open the menu
+        // page so the user can pick options + add manually.
+        window.open(result.fallbackMenuUrl, "_blank", "noopener,noreferrer");
+        setOpenedUrl(result.fallbackMenuUrl);
+      }
+    } catch {
+      // Network / server error — fall back to the plain menu deep-link.
+      if (item.swiggyUrl) {
+        window.open(item.swiggyUrl, "_blank", "noopener,noreferrer");
+      }
+    }
+  };
+
+  const isPending = addToCart.isPending;
+  const succeeded = addToCart.isSuccess && addToCart.data?.ok;
+  const failedButFallback =
+    addToCart.isSuccess && !addToCart.data?.ok && addToCart.data?.fallbackMenuUrl;
+
+  return (
+    <div className="mt-1 space-y-1">
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={isPending}
+        className={cn(
+          "relative flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-white transition",
+          "bg-gradient-to-r from-orange-500 to-saffron-500",
+          "hover:from-orange-600 hover:to-saffron-600 hover:shadow-md hover:shadow-orange-500/30",
+          "active:scale-[0.98]",
+          "disabled:cursor-not-allowed disabled:opacity-80"
+        )}
+      >
+        {isPending ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Adding to cart…
+          </>
+        ) : succeeded ? (
+          <>
+            <Check className="h-3.5 w-3.5" />
+            Opened Swiggy checkout
+          </>
+        ) : (
+          <>
+            Add to Swiggy cart
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </>
+        )}
+      </button>
+
+      {failedButFallback && (
+        <p className="flex items-start gap-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+          Needs customization — opened the menu on Swiggy so you can pick options.
+        </p>
+      )}
+
+      {succeeded && openedUrl && (
+        <p className="text-center text-[11px] text-gray-500 dark:text-gray-400">
+          Cart didn't show up?{" "}
+          <a
+            href={openedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-orange-600"
+          >
+            Reopen Swiggy
+          </a>
+        </p>
+      )}
+    </div>
   );
 }
 
