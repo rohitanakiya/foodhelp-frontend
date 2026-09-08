@@ -16,6 +16,7 @@ import { SwiggyPill } from "@/components/SwiggyPill";
 import { SwiggyReviewNotice } from "@/components/SwiggyReviewNotice";
 import { SwiggyAttribution } from "@/components/SwiggyAttribution";
 import { DemoBanner } from "@/components/DemoBanner";
+import { AddressPicker } from "@/components/AddressPicker";
 import { Hero } from "@/components/Hero";
 import { useConnectSwiggy, useSwiggyStatus } from "@/lib/swiggy";
 
@@ -28,6 +29,9 @@ export function App() {
   // Swiggy status drives the DemoBanner variant (anon vs signed-in-no-Swiggy).
   const { data: swiggyStatus } = useSwiggyStatus(!!user);
   const connectSwiggy = useConnectSwiggy();
+  // AddressPicker owns the persistence; App just holds the current pick
+  // so it can be sent along with each recommend() call.
+  const [addressId, setAddressId] = useState<string | null>(null);
 
   // Handle URL-driven flows on mount: ?swiggy=connected (OAuth
   // return) and ?reset=TOKEN (password reset link from email).
@@ -55,7 +59,7 @@ export function App() {
   }, [qc]);
 
   const mutation = useMutation<RecommendResponse, Error, string>({
-    mutationFn: recommendFood,
+    mutationFn: (text: string) => recommendFood(text, addressId ?? undefined),
   });
 
   const handleSearch = (text: string) => {
@@ -85,6 +89,9 @@ export function App() {
 
           <div className="flex items-center gap-2">
             <div className="hidden sm:block">
+              <AddressPicker enabled={!!user} onChange={setAddressId} />
+            </div>
+            <div className="hidden sm:block">
               <SwiggyPill />
             </div>
             <ThemeToggle />
@@ -103,8 +110,10 @@ export function App() {
           </div>
         </div>
 
-        {/* Swiggy pill on its own row on mobile so it doesn't wrap the header */}
-        <div className="mx-auto flex max-w-4xl items-center justify-end px-4 pb-2 sm:hidden">
+        {/* Swiggy pill + address picker on their own row on mobile so
+            they don't wrap the header */}
+        <div className="mx-auto flex max-w-4xl items-center justify-end gap-2 px-4 pb-2 sm:hidden">
+          <AddressPicker enabled={!!user} onChange={setAddressId} />
           <SwiggyPill />
         </div>
       </header>

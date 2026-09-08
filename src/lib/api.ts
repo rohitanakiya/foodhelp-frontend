@@ -150,13 +150,35 @@ export interface SwiggyStatus {
   scope?: string;
 }
 
+export interface SwiggyAddress {
+  addressId: string;
+  label: string;
+  formattedAddress: string;
+  city: string;
+}
+
+export interface AddressListResponse {
+  connected: boolean;
+  addresses: SwiggyAddress[];
+}
+
 // ── Requests ──
 
-export function recommendFood(text: string): Promise<RecommendResponse> {
+export function recommendFood(
+  text: string,
+  addressId?: string
+): Promise<RecommendResponse> {
   return request<RecommendResponse>("/chat/recommend", {
     method: "POST",
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(addressId ? { text, addressId } : { text }),
   });
+}
+
+/** Lists the user's Swiggy addresses so the frontend can render a
+ *  picker. Returns `{ connected: false, addresses: [] }` when the user
+ *  isn't signed in or hasn't connected Swiggy — safe to call always. */
+export function fetchSwiggyAddresses(): Promise<AddressListResponse> {
+  return request<AddressListResponse>("/chat/addresses");
 }
 
 export function signup(
